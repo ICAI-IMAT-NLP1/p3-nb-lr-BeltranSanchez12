@@ -33,8 +33,18 @@ class LogisticRegression:
             None: The function updates the model weights in place.
         """
         # TODO: Implement gradient-descent algorithm to optimize logistic regression weights
-        return
+        num_samples, num_features = features.shape
+        features = torch.cat([features, torch.ones((num_samples, 1))], dim=1)  # Añadir sesgo
 
+        if self._weights is None:
+            self._weights = self.initialize_parameters(num_features + 1, self.random_state)
+
+        for _ in range(epochs):
+            predictions = self.predict_proba(features)
+            errors = predictions.view(-1, 1) - labels.view(-1, 1)  # Column vectors
+            gradient = torch.matmul(features.T, errors) / num_samples
+            self._weights -= learning_rate * gradient            
+    
     def predict(self, features: torch.Tensor, cutoff: float = 0.5) -> torch.Tensor:
         """
         Predict class labels for given examples based on a cutoff threshold.
@@ -46,28 +56,48 @@ class LogisticRegression:
         Returns:
             torch.Tensor: Predicted class labels (0 or 1).
         """
-        decisions: torch.Tensor = None
-        return decisions
+        probabilities = self.predict_proba(features)
+        return (probabilities >= cutoff).float()
 
     def predict_proba(self, features: torch.Tensor) -> torch.Tensor:
         """
         Predicts the probability of each sample belonging to the positive class using pre-processed features.
-
+        
         Args:
             features (torch.Tensor): The bag of words representations of the input examples.
-
+            
         Returns:
             torch.Tensor: A tensor of probabilities for each input sample being in the positive class.
-
+            
         Raises:
             ValueError: If the model weights are not initialized (model not trained).
         """
-        if self.weights is None:
+        if self._weights is None:
             raise ValueError("Model not trained. Call the 'train' method first.")
         
-        probabilities: torch.Tensor = None
-        
-        return probabilities
+        num_samples = features.shape[0]
+        features = torch.cat([features, torch.ones((num_samples, 1))], dim=1)  # Agregar el sesgo
+
+        logits = torch.matmul(features, self.weights.view(-1, 1))  # Matmul con pesos
+        return self.sigmoid(logits).squeeze()
+
+
+
+    def predict_proba(self, features: torch.Tensor) -> torch.Tensor:
+        """
+        Predicts the probability of each sample belonging to the positive class using pre-processed features.
+        """
+        if self._weights is None:
+            raise ValueError("Model not trained. Call the 'train' method first.")
+
+        # Verificar si features ya tiene el sesgo (misma cantidad de columnas que los pesos)
+        if features.shape[1] == self.weights.shape[0] - 1:
+            num_samples = features.shape[0]
+            features = torch.cat([features, torch.ones((num_samples, 1))], dim=1)  # Agregar el sesgo solo si es necesario
+
+        logits = torch.matmul(features, self.weights.view(-1, 1))  # Matmul con pesos
+        return self.sigmoid(logits).squeeze()
+
 
     def initialize_parameters(self, dim: int, random_state: int) -> torch.Tensor:
         """
@@ -84,10 +114,8 @@ class LogisticRegression:
             torch.Tensor: Initialized weights as a tensor with size (dim + 1,).
         """
         torch.manual_seed(random_state)
-        
-        params: torch.Tensor = None
-        
-        return params
+        return torch.randn((dim, 1), dtype=torch.float32) #Column vector
+
 
     @staticmethod
     def sigmoid(z: torch.Tensor) -> torch.Tensor:
@@ -103,8 +131,7 @@ class LogisticRegression:
         Returns:
             torch.Tensor: The sigmoid of z.
         """
-        result: torch.Tensor = None
-        return result
+        return 1 / (1 + torch.exp(-z))
 
     @staticmethod
     def binary_cross_entropy_loss(
@@ -123,13 +150,14 @@ class LogisticRegression:
         Returns:
             torch.Tensor: The computed binary cross-entropy loss.
         """
-        ce_loss: torch.Tensor = None
-        return ce_loss
+        epsilon = 1e-9  
+        predictions = torch.clamp(predictions, epsilon, 1 - epsilon)
+        return -torch.mean(targets * torch.log(predictions) + (1 - targets) * torch.log(1 - predictions))
 
     @property
     def weights(self):
         """Get the weights of the logistic regression model."""
-        return self._weights
+        return self._weights.view(-1)
 
     @weights.setter
     def weights(self, value):

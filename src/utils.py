@@ -2,7 +2,7 @@ from typing import List, Dict
 import torch
 import re
 import string
-
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 def remove_punctuations(input_col):
     """To remove all the punctuations present in the text.Input the text column"""
@@ -90,6 +90,15 @@ def evaluate_classification(predictions: torch.Tensor, labels: torch.Tensor) -> 
     Returns:
         dict: A dictionary containing the calculated metrics.
     """
-    metrics: Dict[str, float] = None
-
+    predictions = predictions.cpu().numpy()
+    labels = labels.cpu().numpy()
+    
+    metrics = {
+        "accuracy": accuracy_score(labels, predictions),
+        "precision": precision_score(labels, predictions), # average='binary'?
+        "recall": recall_score(labels, predictions),
+        "f1_score": f1_score(labels, predictions)
+    }
+    
     return metrics
+
